@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.WindowsAPICodePack.Shell;
 using Microsoft.WindowsAPICodePack.Shell.PropertySystem;
 
@@ -27,28 +24,54 @@ namespace GoPRO_MP4_Renamer
                 return;
             }
 
-            foreach (FileInfo fileInfo in sourceDir.GetFiles("*.MP4", SearchOption.TopDirectoryOnly))
+            var fileInfos = sourceDir.EnumerateFiles("*.MP4", SearchOption.AllDirectories).Union(sourceDir.EnumerateFiles("*.JPG", SearchOption.AllDirectories));
+
+            foreach (FileInfo fileInfo in fileInfos)
             {
-                if (false == string.Equals(fileInfo.Extension, ".MP4", StringComparison.CurrentCultureIgnoreCase)) continue;
+                DateTime? dateEncoded = null;
 
-                ShellObject shellObject = ShellObject.FromParsingName(fileInfo.FullName);
-
-                if (shellObject == null)
+                if (string.Equals(fileInfo.Extension, ".MP4", StringComparison.OrdinalIgnoreCase))
                 {
-                    Console.WriteLine($"GoPROMP4Renamer - ParsingName for [{fileInfo.Name}] to ShellObject failed.");
-                    continue;
+                    ShellObject shellObject = ShellObject.FromParsingName(fileInfo.FullName);
+
+                    if (shellObject == null)
+                    {
+                        Console.WriteLine($"GoPROMP4Renamer - ParsingName for [{fileInfo.Name}] to ShellObject failed.");
+                        continue;
+                    }
+
+                    dateEncoded = shellObject.Properties.GetProperty(SystemProperties.System.Media.DateEncoded)?.ValueAsObject as DateTime?;
+
+                    if (dateEncoded == null)
+                    {
+                        Console.WriteLine($"GoPROMP4Renamer - System.Media.DateEncoded for [{fileInfo.Name}] returned null.");
+                        continue;
+                    }
+                }
+                else if (string.Equals(fileInfo.Extension, ".JPG", StringComparison.OrdinalIgnoreCase))
+                {
+                    ShellObject shellObject = ShellObject.FromParsingName(fileInfo.FullName);
+
+                    if (shellObject == null)
+                    {
+                        Console.WriteLine($"GoPROMP4Renamer - ParsingName for [{fileInfo.Name}] to ShellObject failed.");
+                        continue;
+                    }
+
+                    dateEncoded = shellObject.Properties.GetProperty(SystemProperties.System.Photo.DateTaken)?.ValueAsObject as DateTime?;
+
+                    if (dateEncoded == null)
+                    {
+                        Console.WriteLine($"GoPROMP4Renamer - System.Media.DateEncoded for [{fileInfo.Name}] returned null.");
+                        continue;
+                    }
                 }
 
-                DateTime? dateEncoded = shellObject.Properties.GetProperty(SystemProperties.System.Media.DateEncoded)?.ValueAsObject as DateTime?;
-
-                if (dateEncoded == null)
-                {
-                    Console.WriteLine($"GoPROMP4Renamer - System.Media.DateEncoded for [{fileInfo.Name}] returned null.");
-                    continue;
-                }
+                if (dateEncoded == null) continue;
+                if (fileInfo.DirectoryName == null) continue;
 
                 DateTime mediaCreated = dateEncoded.Value;
-                FileInfo newFileInfo = new FileInfo(Path.Combine(sourceDir.FullName, $"Img{mediaCreated:yyyyMMdd}_{mediaCreated:HHmmss}{fileInfo.Extension}"));
+                FileInfo newFileInfo = new FileInfo(Path.Combine(fileInfo.DirectoryName, $"Img{mediaCreated:yyyyMMdd}_{mediaCreated:HHmmss}{fileInfo.Extension}"));
 
                 if (newFileInfo.Exists)
                 {
